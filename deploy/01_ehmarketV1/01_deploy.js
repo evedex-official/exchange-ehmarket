@@ -11,9 +11,9 @@ module.exports = migration(async (deployer) => {
     throw new Error('Invalid collateral wallet address');
   }
 
-  await deployer.deploy('contracts/EHMarket.sol:EHMarket', {
+  await deployer.deployProxy('contracts/EHMarketV1.sol:EHMarketV1', {
     name: 'EHMarket',
     args: [matchers, collateral],
   });
 });
-module.exports.tags = ['NonUpgradable'];
+module.exports.tags = ['Upgradable'];
