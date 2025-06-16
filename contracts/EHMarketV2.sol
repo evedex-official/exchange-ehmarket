@@ -84,8 +84,8 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
       hourlyWithdrawals[currentHour] += amount;
       userHourlyWithdrawals[currentHour][from] += amount;
     }
-    IERC20(collateral).safeTransfer(from, amount);
     emit UserBalanceChanged(from, -int256(amount), requestId);
+    IERC20(collateral).safeTransfer(from, amount);
   }
 
   function setDelegate(address delegate, uint256 allowance) external {
@@ -130,16 +130,16 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
   }
 
   /**
-   * @notice Calculates total withdrawals for a given time window
+   * @notice Calculates total of withdrawals for a given time window
    * @dev Sums up hourly withdrawals from the specified timestamp looking back by the specified hours
    * @param _hours Number of hours to look back
    * @param timestamp The timestamp to start calculations from
-   * @return Total withdrawals during the specified period
+   * @return Total of withdrawals during the specified period
    */
   function getTotalWithdraw(uint16 _hours, uint256 timestamp) public view returns (uint256) {
     uint256 total = 0;
     uint256 startHour = _getHour(timestamp);
-    for (uint16 i = 0; i < _hours; i++) {
+    for (uint256 i = 0; i < _hours; i++) {
       total += hourlyWithdrawals[startHour - i * 1 hours];
     }
     return total;
@@ -153,10 +153,10 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
    * @param user The user address to check
    * @return User's total withdrawals during the specified period
    */
-  function getTotalWithdraw(uint16 _hours, uint256 timestamp, address user) public view returns (uint256) {
+  function getUserTotalWithdraw(uint16 _hours, uint256 timestamp, address user) public view returns (uint256) {
     uint256 total = 0;
     uint256 startHour = _getHour(timestamp);
-    for (uint16 i = 0; i < _hours; i++) {
+    for (uint256 i = 0; i < _hours; i++) {
       total += userHourlyWithdrawals[startHour - i * 1 hours][user];
     }
     return total;
@@ -189,7 +189,7 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
       } else {
         return (0, i, false);
       }
-      uint256 userWithdrawn = getTotalWithdraw(limit.timeWindow, timestamp, user);
+      uint256 userWithdrawn = getUserTotalWithdraw(limit.timeWindow, timestamp, user);
       uint256 userRemaining = 0;
       if (limit.userLimit > userWithdrawn) {
         userRemaining = limit.userLimit - userWithdrawn;
@@ -234,7 +234,7 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
       if (totalWithdraw + amount > limit.limit) {
         revert TotalLimitExceeded(totalWithdraw, amount, i);
       }
-      uint256 userTotalWithdraw = getTotalWithdraw(limit.timeWindow, timestamp, user);
+      uint256 userTotalWithdraw = getUserTotalWithdraw(limit.timeWindow, timestamp, user);
       if (userTotalWithdraw + amount > limit.userLimit) {
         revert UserLimitExceeded(userTotalWithdraw, amount, i);
       }
