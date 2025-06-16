@@ -92,6 +92,9 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
     emit DelegateUpdated(_msgSender(), delegate, allowance);
   }
 
+  /**
+   * @notice Replaces all withdrawal limits with a new set
+   */
   function setWithdrawLimits(WithdrawLimit[] memory _withdrawLimits) external onlyRole(OWNER_ROLE) {
     delete withdrawLimits;
     for (uint i = 0; i < _withdrawLimits.length; i++) {
@@ -112,6 +115,12 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
     emit WithdrawLimitsUpdated(withdrawLimits);
   }
 
+  /**
+   * @notice Adds a new withdrawal limit configuration
+   * @param limit Total withdrawal limit for the time window
+   * @param userLimit Per-user withdrawal limit for the time window
+   * @param timeWindow Time window in hours
+   */
   function addWithdrawLimit(uint256 limit, uint256 userLimit, uint16 timeWindow) external onlyRole(OWNER_ROLE) {
     if (limit == 0 || userLimit == 0 || timeWindow == 0 || limit < userLimit) {
       revert InvalidWithdrawLimit(limit, userLimit, timeWindow);
@@ -120,6 +129,13 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
     emit WithdrawLimitAdded(timeWindow, limit, userLimit);
   }
 
+  /**
+   * @notice Calculates total withdrawals for a given time window
+   * @dev Sums up hourly withdrawals from the specified timestamp looking back by the specified hours
+   * @param _hours Number of hours to look back
+   * @param timestamp The timestamp to start calculations from
+   * @return Total withdrawals during the specified period
+   */
   function getTotalWithdraw(uint16 _hours, uint256 timestamp) public view returns (uint256) {
     uint256 total = 0;
     uint256 startHour = _getHour(timestamp);
@@ -129,6 +145,14 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
     return total;
   }
 
+  /**
+   * @notice Calculates a user's total withdrawals for a given time window
+   * @dev Sums up user's hourly withdrawals from the specified timestamp looking back by the specified hours
+   * @param _hours Number of hours to look back
+   * @param timestamp The timestamp to start calculations from
+   * @param user The user address to check
+   * @return User's total withdrawals during the specified period
+   */
   function getTotalWithdraw(uint16 _hours, uint256 timestamp, address user) public view returns (uint256) {
     uint256 total = 0;
     uint256 startHour = _getHour(timestamp);
@@ -138,6 +162,14 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
     return total;
   }
 
+  /**
+   * @notice Calculates maximum amount user can withdraw without exceeding any limits
+   * @dev Checks all withdrawal limits and returns the most restrictive one
+   * @param user Address of the user
+   * @return maxAmount Maximum amount the user can withdraw
+   * @return limitingIndex Index of the withdraw limit that is currently the most restrictive
+   * @return isUserLimit Boolean indicating whether the restriction is from a user limit (true) or global limit (false)
+   */
   function getMaxWithdrawAmount(
     address user
   ) public view returns (uint256 maxAmount, uint256 limitingIndex, bool isUserLimit) {
@@ -188,6 +220,12 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
     return timestamp - (timestamp % 1 hours);
   }
 
+  /**
+   * @notice Verifies that a withdrawal does not exceed configured limits
+   * @dev Checks both global and per-user limits for all configured time windows
+   * @param amount Amount to withdraw
+   * @param user User address attempting to withdraw
+   */
   function _checkWithdrawLimits(uint256 amount, address user) internal view {
     uint256 timestamp = block.timestamp;
     for (uint256 i = 0; i < withdrawLimits.length; i++) {
