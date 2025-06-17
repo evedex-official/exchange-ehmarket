@@ -25,7 +25,6 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
 
   event UserBalanceChanged(address indexed account, int256 amount, uint256 requestId);
   event DelegateUpdated(address indexed delegator, address indexed delegate, uint256 allowance);
-  event WithdrawLimitAdded(uint16 timeWindow, uint256 limit, uint256 userLimit);
   event WithdrawLimitsUpdated(WithdrawLimit[] withdrawLimits);
 
   bytes32 public constant MATCHER_ROLE = keccak256("MATCHER_ROLE");
@@ -118,20 +117,6 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
       withdrawLimits.push(_withdrawLimits[i]);
     }
     emit WithdrawLimitsUpdated(withdrawLimits);
-  }
-
-  /**
-   * @notice Adds a new withdrawal limit configuration
-   * @param limit Total withdrawal limit for the time window
-   * @param userLimit Per-user withdrawal limit for the time window
-   * @param timeWindow Time window in hours
-   */
-  function addWithdrawLimit(uint256 limit, uint256 userLimit, uint16 timeWindow) external onlyRole(OWNER_ROLE) {
-    if (limit == 0 || userLimit == 0 || timeWindow == 0 || limit < userLimit) {
-      revert InvalidWithdrawLimit(limit, userLimit, timeWindow);
-    }
-    withdrawLimits.push(WithdrawLimit(limit, userLimit, timeWindow));
-    emit WithdrawLimitAdded(timeWindow, limit, userLimit);
   }
 
   /**
