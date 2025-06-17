@@ -317,9 +317,11 @@ class Deployer {
     const artifact = await this.hre.artifacts.readArtifact(implementation);
     const factory = await this.hre.ethers.getContractFactoryFromArtifact(artifact, { libraries });
     const contract = await this.hre.upgrades.upgradeProxy(proxy.address, factory, {
+      ...options,
       call: initializer !== false ? { fn: initializer, args } : undefined,
     });
-    const tx = contract.deploymentTransaction();
+    // wtf?
+    const tx = contract.deploymentTransaction() || contract.deployTransaction;
     console.info(
       new Info()
         .nl(`===== ${proxyName} -> ${implementation} =====`)
@@ -523,7 +525,7 @@ task('deploy', 'Deploy contracts')
     const artifactDir = options.artifact !== '' ? options.artifact : hre.config.paths.deployments;
     const signers = await hre.ethers.getSigners();
     const namedAccounts = Object.entries(hre.config.namedAccounts).reduce((result, [name, config]) => {
-      const accountIndex = config[hre.network.name] ? config[hre.network.name] : config[''] ?? 0;
+      const accountIndex = config[hre.network.name] ? config[hre.network.name] : (config[''] ?? 0);
       return { ...result, [name]: signers[accountIndex] };
     }, {});
     const deploymentsDir = path.resolve(artifactDir, hre.network.name);
