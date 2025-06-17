@@ -22,6 +22,7 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
   error UserLimitExceeded(uint256 currentTotal, uint256 requestedAmount, uint256 configIndex);
   error InvalidWithdrawLimit(uint256 limit, uint256 userLimit, uint16 timeWindow);
   error InvalidWithdrawLimitLength();
+  error DuplicateWithdrawLimit(uint16 timeWindow);
 
   event UserBalanceChanged(address indexed account, int256 amount, uint256 requestId);
   event DelegateUpdated(address indexed delegator, address indexed delegate, uint256 allowance);
@@ -95,26 +96,40 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
 
   /**
    * @notice Replaces all withdrawal limits with a new set
+   * @dev set will be sorted by timeWindow in ascending order
    */
   function setWithdrawLimits(WithdrawLimit[] memory _withdrawLimits) external onlyRole(OWNER_ROLE) {
-    delete withdrawLimits;
     if (_withdrawLimits.length > MAX_LIMIT_CONFIGS) {
       revert InvalidWithdrawLimitLength();
     }
+    delete withdrawLimits;
+    uint256 timeWindowBitmap = 0;
     for (uint256 i = 0; i < _withdrawLimits.length; i++) {
+      WithdrawLimit memory newLimit = _withdrawLimits[i];
       if (
-        _withdrawLimits[i].limit == 0 ||
-        _withdrawLimits[i].userLimit == 0 ||
-        _withdrawLimits[i].timeWindow == 0 ||
-        _withdrawLimits[i].limit < _withdrawLimits[i].userLimit
+        newLimit.limit == 0 ||
+        newLimit.userLimit == 0 ||
+        newLimit.timeWindow == 0 ||
+        newLimit.limit < newLimit.userLimit
       ) {
-        revert InvalidWithdrawLimit(
-          _withdrawLimits[i].limit,
-          _withdrawLimits[i].userLimit,
-          _withdrawLimits[i].timeWindow
-        );
+        revert InvalidWithdrawLimit(newLimit.limit, newLimit.userLimit, newLimit.timeWindow);
       }
-      withdrawLimits.push(_withdrawLimits[i]);
+      uint256 timeWindowBit = 1 << newLimit.timeWindow;
+      if (timeWindowBitmap & timeWindowBit != 0) {
+        revert DuplicateWithdrawLimit(newLimit.timeWindow);
+      }
+      timeWindowBitmap |= timeWindowBit;
+      uint256 pos = 0;
+      while (pos < withdrawLimits.length && withdrawLimits[pos].timeWindow < newLimit.timeWindow) {
+        pos++;
+      }
+      withdrawLimits.push();
+      if (pos < withdrawLimits.length - 1) {
+        for (uint256 j = withdrawLimits.length - 1; j > pos; j--) {
+          withdrawLimits[j] = withdrawLimits[j - 1];
+        }
+      }
+      withdrawLimits[pos] = newLimit;
     }
     emit WithdrawLimitsUpdated(withdrawLimits);
   }
@@ -217,16 +232,25 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
    * @param user User address attempting to withdraw
    */
   function _checkWithdrawLimits(uint256 amount, address user) internal view {
+    if (withdrawLimits.length == 0) return;
     uint256 timestamp = block.timestamp;
+    uint256 startHour = _getHour(timestamp);
+    uint256 globalTotal = 0;
+    uint256 userTotal = 0;
+    uint16 lastCheckedHour = 0;
     for (uint256 i = 0; i < withdrawLimits.length; i++) {
       WithdrawLimit memory limit = withdrawLimits[i];
-      uint256 totalWithdraw = getTotalWithdraw(limit.timeWindow, timestamp);
-      if (totalWithdraw + amount > limit.limit) {
-        revert TotalLimitExceeded(totalWithdraw, amount, i);
+      for (uint16 h = lastCheckedHour; h < limit.timeWindow; h++) {
+        uint256 hourToCheck = startHour - h * 1 hours;
+        globalTotal += hourlyWithdrawals[hourToCheck];
+        userTotal += userHourlyWithdrawals[hourToCheck][user];
       }
-      uint256 userTotalWithdraw = getUserTotalWithdraw(limit.timeWindow, timestamp, user);
-      if (userTotalWithdraw + amount > limit.userLimit) {
-        revert UserLimitExceeded(userTotalWithdraw, amount, i);
+      lastCheckedHour = limit.timeWindow;
+      if (globalTotal + amount > limit.limit) {
+        revert TotalLimitExceeded(globalTotal, amount, i);
+      }
+      if (userTotal + amount > limit.userLimit) {
+        revert UserLimitExceeded(userTotal, amount, i);
       }
     }
   }
