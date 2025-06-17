@@ -59,9 +59,7 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
       _grantRole(MATCHER_ROLE, _matchers[i]);
     }
     collateral = _collateral;
-    for (uint i = 0; i < _initialWithdrawLimits.length; i++) {
-      withdrawLimits.push(_initialWithdrawLimits[i]);
-    }
+    setWithdrawLimits(_initialWithdrawLimits);
   }
 
   //////////////////////////
@@ -98,7 +96,7 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
    * @notice Replaces all withdrawal limits with a new set
    * @dev set will be sorted by timeWindow in ascending order
    */
-  function setWithdrawLimits(WithdrawLimit[] memory _withdrawLimits) external onlyRole(OWNER_ROLE) {
+  function setWithdrawLimits(WithdrawLimit[] memory _withdrawLimits) public onlyRole(OWNER_ROLE) {
     if (_withdrawLimits.length > MAX_LIMIT_CONFIGS) {
       revert InvalidWithdrawLimitLength();
     }
