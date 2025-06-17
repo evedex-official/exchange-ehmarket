@@ -31,6 +31,7 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
   bytes32 public constant MATCHER_ROLE = keccak256("MATCHER_ROLE");
   address public collateral;
 
+  bool public migratedToV2;
   uint256 public constant MAX_LIMIT_CONFIGS = 20;
 
   mapping(uint256 => uint256) public hourlyWithdrawals;
@@ -56,7 +57,13 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
       _grantRole(MATCHER_ROLE, _matchers[i]);
     }
     collateral = _collateral;
-    setWithdrawLimits(_initialWithdrawLimits);
+    _setWithdrawLimits(_initialWithdrawLimits);
+  }
+
+  function migrateToV2(WithdrawLimit[] memory _initialWithdrawLimits) public {
+    require(!migratedToV2, "Already migrated to V2");
+    _setWithdrawLimits(_initialWithdrawLimits);
+    migratedToV2 = true;
   }
 
   //////////////////////////
@@ -94,39 +101,7 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
    * @dev set will be sorted by timeWindow in ascending order
    */
   function setWithdrawLimits(WithdrawLimit[] memory _withdrawLimits) public onlyRole(DEFAULT_ADMIN_ROLE) {
-    if (_withdrawLimits.length > MAX_LIMIT_CONFIGS) {
-      revert InvalidWithdrawLimitLength();
-    }
-    delete withdrawLimits;
-    uint256 timeWindowBitmap = 0;
-    for (uint256 i = 0; i < _withdrawLimits.length; i++) {
-      WithdrawLimit memory newLimit = _withdrawLimits[i];
-      if (
-        newLimit.limit == 0 ||
-        newLimit.userLimit == 0 ||
-        newLimit.timeWindow == 0 ||
-        newLimit.limit < newLimit.userLimit
-      ) {
-        revert InvalidWithdrawLimit(newLimit.limit, newLimit.userLimit, newLimit.timeWindow);
-      }
-      uint256 timeWindowBit = 1 << newLimit.timeWindow;
-      if (timeWindowBitmap & timeWindowBit != 0) {
-        revert DuplicateWithdrawLimit(newLimit.timeWindow);
-      }
-      timeWindowBitmap |= timeWindowBit;
-      uint256 pos = 0;
-      while (pos < withdrawLimits.length && withdrawLimits[pos].timeWindow < newLimit.timeWindow) {
-        pos++;
-      }
-      withdrawLimits.push();
-      if (pos < withdrawLimits.length - 1) {
-        for (uint256 j = withdrawLimits.length - 1; j > pos; j--) {
-          withdrawLimits[j] = withdrawLimits[j - 1];
-        }
-      }
-      withdrawLimits[pos] = newLimit;
-    }
-    emit WithdrawLimitsUpdated(withdrawLimits);
+    _setWithdrawLimits(_withdrawLimits);
   }
 
   /**
@@ -248,5 +223,46 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
         revert UserLimitExceeded(userTotal, amount, i);
       }
     }
+  }
+
+  /**
+   * @dev Internal implementation of setWithdrawLimits.
+   * See {setWithdrawLimits} for details.
+   * @dev Additional note: Used for migration purposes.
+   */
+  function _setWithdrawLimits(WithdrawLimit[] memory _withdrawLimits) private {
+    if (_withdrawLimits.length > MAX_LIMIT_CONFIGS) {
+      revert InvalidWithdrawLimitLength();
+    }
+    delete withdrawLimits;
+    uint256 timeWindowBitmap = 0;
+    for (uint256 i = 0; i < _withdrawLimits.length; i++) {
+      WithdrawLimit memory newLimit = _withdrawLimits[i];
+      if (
+        newLimit.limit == 0 ||
+        newLimit.userLimit == 0 ||
+        newLimit.timeWindow == 0 ||
+        newLimit.limit < newLimit.userLimit
+      ) {
+        revert InvalidWithdrawLimit(newLimit.limit, newLimit.userLimit, newLimit.timeWindow);
+      }
+      uint256 timeWindowBit = 1 << newLimit.timeWindow;
+      if (timeWindowBitmap & timeWindowBit != 0) {
+        revert DuplicateWithdrawLimit(newLimit.timeWindow);
+      }
+      timeWindowBitmap |= timeWindowBit;
+      uint256 pos = 0;
+      while (pos < withdrawLimits.length && withdrawLimits[pos].timeWindow < newLimit.timeWindow) {
+        pos++;
+      }
+      withdrawLimits.push();
+      if (pos < withdrawLimits.length - 1) {
+        for (uint256 j = withdrawLimits.length - 1; j > pos; j--) {
+          withdrawLimits[j] = withdrawLimits[j - 1];
+        }
+      }
+      withdrawLimits[pos] = newLimit;
+    }
+    emit WithdrawLimitsUpdated(withdrawLimits);
   }
 }
