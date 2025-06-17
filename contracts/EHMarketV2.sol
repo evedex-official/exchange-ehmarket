@@ -31,7 +31,6 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
   bytes32 public constant MATCHER_ROLE = keccak256("MATCHER_ROLE");
   address public collateral;
 
-  bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
   uint256 public constant MAX_LIMIT_CONFIGS = 20;
 
   mapping(uint256 => uint256) public hourlyWithdrawals;
@@ -48,13 +47,11 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
   function initialize(
     address[] memory _matchers,
     address _collateral,
-    address _owner,
     WithdrawLimit[] memory _initialWithdrawLimits
   ) public initializer {
     __AccessControlEnumerable_init();
 
     _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
-    _grantRole(OWNER_ROLE, _owner);
     for (uint i = 0; i < _matchers.length; i++) {
       _grantRole(MATCHER_ROLE, _matchers[i]);
     }
@@ -77,7 +74,7 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
 
   function withdrawAsset(address from, uint256 amount, uint256 requestId) external {
     bool isMatcher = hasRole(MATCHER_ROLE, _msgSender());
-    require(isMatcher || hasRole(OWNER_ROLE, _msgSender()), UnauthorizedSigner());
+    require(isMatcher || hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), UnauthorizedSigner());
     if (isMatcher) {
       _checkWithdrawLimits(amount, from);
       uint256 currentHour = _getHour(block.timestamp);
@@ -96,7 +93,7 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
    * @notice Replaces all withdrawal limits with a new set
    * @dev set will be sorted by timeWindow in ascending order
    */
-  function setWithdrawLimits(WithdrawLimit[] memory _withdrawLimits) public onlyRole(OWNER_ROLE) {
+  function setWithdrawLimits(WithdrawLimit[] memory _withdrawLimits) public onlyRole(DEFAULT_ADMIN_ROLE) {
     if (_withdrawLimits.length > MAX_LIMIT_CONFIGS) {
       revert InvalidWithdrawLimitLength();
     }
@@ -238,7 +235,7 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
     uint16 lastCheckedHour = 0;
     for (uint256 i = 0; i < withdrawLimits.length; i++) {
       WithdrawLimit memory limit = withdrawLimits[i];
-      for (uint16 h = lastCheckedHour; h < limit.timeWindow; h++) {
+      for (uint256 h = lastCheckedHour; h < limit.timeWindow; h++) {
         uint256 hourToCheck = startHour - h * 1 hours;
         globalTotal += hourlyWithdrawals[hourToCheck];
         userTotal += userHourlyWithdrawals[hourToCheck][user];
