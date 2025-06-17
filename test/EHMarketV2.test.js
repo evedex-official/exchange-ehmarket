@@ -79,6 +79,46 @@ describe('EHMarketV2', function () {
         .to.emit(market, 'UserBalanceChanged')
         .withArgs(await alice.getAddress(), `-${amount.toString()}`, 1);
     });
+
+    it('should allow admin to add matcher', async function () {
+      const { owner, market, alice } = container;
+      const matcherRole = await market.MATCHER_ROLE();
+      expect(await market.hasRole(matcherRole, alice.address)).to.be.false;
+      await expect(market.connect(owner).grantRole(matcherRole, alice.address))
+        .to.emit(market, 'RoleGranted')
+        .withArgs(matcherRole, alice.address, owner.address);
+      expect(await market.hasRole(matcherRole, alice.address)).to.be.true;
+    });
+
+    it('should allow admin to add another admin', async function () {
+      const { owner, market, bob } = container;
+      const adminRole = await market.DEFAULT_ADMIN_ROLE();
+      expect(await market.hasRole(adminRole, bob.address)).to.be.false;
+      await expect(market.connect(owner).grantRole(adminRole, bob.address))
+        .to.emit(market, 'RoleGranted')
+        .withArgs(adminRole, bob.address, owner.address);
+      expect(await market.hasRole(adminRole, bob.address)).to.be.true;
+    });
+
+    it('should allow admin to remove matcher', async function () {
+      const { owner, market, alice } = container;
+      const matcherRole = await market.MATCHER_ROLE();
+      expect(await market.hasRole(matcherRole, alice.address)).to.be.true;
+      await expect(market.connect(owner).revokeRole(matcherRole, alice.address))
+        .to.emit(market, 'RoleRevoked')
+        .withArgs(matcherRole, alice.address, owner.address);
+      expect(await market.hasRole(matcherRole, alice.address)).to.be.false;
+    });
+
+    it('should allow admin to remove another admin', async function () {
+      const { owner, market, bob } = container;
+      const adminRole = await market.DEFAULT_ADMIN_ROLE();
+      expect(await market.hasRole(adminRole, bob.address)).to.be.true;
+      await expect(market.connect(owner).revokeRole(adminRole, bob.address))
+        .to.emit(market, 'RoleRevoked')
+        .withArgs(adminRole, bob.address, owner.address);
+      expect(await market.hasRole(adminRole, bob.address)).to.be.false;
+    });
   });
 
   describe('withdraw limits', async function () {
