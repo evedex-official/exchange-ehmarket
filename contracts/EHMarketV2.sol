@@ -21,6 +21,7 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
   error TotalLimitExceeded(uint256 currentTotal, uint256 requestedAmount, uint256 configIndex);
   error UserLimitExceeded(uint256 currentTotal, uint256 requestedAmount, uint256 configIndex);
   error InvalidWithdrawLimit(uint256 limit, uint256 userLimit, uint16 timeWindow);
+  error InvalidWithdrawLimitLength();
 
   event UserBalanceChanged(address indexed account, int256 amount, uint256 requestId);
   event DelegateUpdated(address indexed delegator, address indexed delegate, uint256 allowance);
@@ -31,6 +32,7 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
   address public collateral;
 
   bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
+  uint256 public constant MAX_LIMIT_CONFIGS = 20;
 
   mapping(uint256 => uint256) public hourlyWithdrawals;
   mapping(uint256 => mapping(address => uint256)) public userHourlyWithdrawals;
@@ -97,7 +99,10 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
    */
   function setWithdrawLimits(WithdrawLimit[] memory _withdrawLimits) external onlyRole(OWNER_ROLE) {
     delete withdrawLimits;
-    for (uint i = 0; i < _withdrawLimits.length; i++) {
+    if (_withdrawLimits.length > MAX_LIMIT_CONFIGS) {
+      revert InvalidWithdrawLimitLength();
+    }
+    for (uint256 i = 0; i < _withdrawLimits.length; i++) {
       if (
         _withdrawLimits[i].limit == 0 ||
         _withdrawLimits[i].userLimit == 0 ||
