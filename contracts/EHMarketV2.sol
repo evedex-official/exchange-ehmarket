@@ -30,7 +30,6 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
   bytes32 public constant MATCHER_ROLE = keccak256("MATCHER_ROLE");
   address public collateral;
 
-  bool public migratedToV2;
   uint256 public constant MAX_LIMIT_CONFIGS = 20;
 
   mapping(uint256 => uint256) public hourlyWithdrawals;
@@ -57,12 +56,6 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
     }
     collateral = _collateral;
     _setWithdrawLimits(_initialWithdrawLimits);
-  }
-
-  function migrateToV2(WithdrawLimit[] memory _initialWithdrawLimits) public {
-    require(!migratedToV2, "Already migrated to V2");
-    _setWithdrawLimits(_initialWithdrawLimits);
-    migratedToV2 = true;
   }
 
   //////////////////////////
