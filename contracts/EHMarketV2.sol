@@ -97,7 +97,7 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
 
   /**
    * @notice Replaces all withdrawal limits with a new set
-   * @dev set will be sorted by timeWindow in ascending order
+   * @notice _withdrawLimits should be sorted in ascending order
    */
   function setWithdrawLimits(WithdrawLimit[] memory _withdrawLimits) public onlyRole(DEFAULT_ADMIN_ROLE) {
     _setWithdrawLimits(_withdrawLimits);
@@ -150,27 +150,29 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
     maxAmount = type(uint256).max;
     limitingIndex = type(uint256).max;
     isUserLimit = false;
-    uint256 timestamp = block.timestamp;
     if (withdrawLimits.length == 0) {
       return (maxAmount, limitingIndex, isUserLimit);
     }
+    uint256 baseTimestamp = block.timestamp;
+    uint256 globalTotal;
+    uint256 userTotal;
+    uint16 lastTimeWindow;
     for (uint256 i = 0; i < withdrawLimits.length; i++) {
       WithdrawLimit memory limit = withdrawLimits[i];
-      uint256 totalWithdrawn = getTotalWithdraw(limit.timeWindow, timestamp);
-      uint256 globalRemaining = 0;
-      if (limit.limit > totalWithdrawn) {
-        globalRemaining = limit.limit - totalWithdrawn;
-      } else {
+      uint256 timestamp = baseTimestamp - 1 hours * uint256(lastTimeWindow);
+      uint16 timeWindow = limit.timeWindow - lastTimeWindow;
+      globalTotal += getTotalWithdraw(timeWindow, timestamp);
+      userTotal += getUserTotalWithdraw(timeWindow, timestamp, user);
+      lastTimeWindow = limit.timeWindow;
+      if (globalTotal >= limit.limit) {
         return (0, i, false);
       }
-      uint256 userWithdrawn = getUserTotalWithdraw(limit.timeWindow, timestamp, user);
-      uint256 userRemaining = 0;
-      if (limit.userLimit > userWithdrawn) {
-        userRemaining = limit.userLimit - userWithdrawn;
-      } else {
-        // User limit already reached
+      if (userTotal >= limit.userLimit) {
         return (0, i, true);
       }
+      // Calculate remaining capacity
+      uint256 globalRemaining = limit.limit - globalTotal;
+      uint256 userRemaining = limit.userLimit - userTotal;
       // Determine which is more restrictive
       if (userRemaining < globalRemaining) {
         if (userRemaining < maxAmount) {

@@ -277,16 +277,20 @@ describe('EHMarketV2', function () {
     });
 
     it('should correctly calculate max withdraw amount', async function () {
-      const { owner, market, matcher1, alice, usdt } = container;
+      const { owner, market, matcher1, alice, usdt, bob, carol } = container;
 
       await market.connect(owner).setWithdrawLimits([
         { limit: ethers.parseEther('200'), userLimit: ethers.parseEther('100'), timeWindow: 1 },
-        { limit: ethers.parseEther('1000'), userLimit: ethers.parseEther('500'), timeWindow: 6 },
+        { limit: ethers.parseEther('300'), userLimit: ethers.parseEther('200'), timeWindow: 6 },
       ]);
 
       const depositAmount = ethers.parseEther('2000');
       await usdt.connect(alice).approve(await market.getAddress(), depositAmount);
       await market.connect(alice).depositAsset(depositAmount);
+      await usdt.connect(bob).approve(await market.getAddress(), depositAmount);
+      await market.connect(bob).depositAsset(depositAmount);
+      await usdt.connect(carol).approve(await market.getAddress(), depositAmount);
+      await market.connect(carol).depositAsset(depositAmount);
 
       let maxInfo = await market.getMaxWithdrawAmount(await alice.getAddress());
       expect(maxInfo[0]).to.equal(ethers.parseEther('100')); // Max amount is 100 (from 1-hour limit)
@@ -297,6 +301,45 @@ describe('EHMarketV2', function () {
       // Check max withdraw amount after first withdrawal
       maxInfo = await market.getMaxWithdrawAmount(await alice.getAddress());
       expect(maxInfo[0]).to.equal(ethers.parseEther('50')); // Max amount is 50 (remaining from 1-hour limit)
+
+      await market.connect(matcher1).withdrawAsset(await alice.getAddress(), ethers.parseEther('50'), 1);
+      maxInfo = await market.getMaxWithdrawAmount(await alice.getAddress());
+      expect(maxInfo[0]).to.equal(ethers.parseEther('0'));
+      expect(maxInfo[1]).to.equal(0);
+      expect(maxInfo[2]).to.equal(true);
+
+      await ethers.provider.send('evm_increaseTime', [3600]);
+      await ethers.provider.send('evm_mine');
+
+      await market.connect(matcher1).withdrawAsset(await alice.getAddress(), ethers.parseEther('100'), 1);
+
+      await ethers.provider.send('evm_increaseTime', [3600]);
+      await ethers.provider.send('evm_mine');
+
+      // now Alice should be limited by the 6-hour limit
+      maxInfo = await market.getMaxWithdrawAmount(await alice.getAddress());
+      expect(maxInfo[0]).to.equal(ethers.parseEther('0'));
+      expect(maxInfo[1]).to.equal(1); // Limiting index is 1 (the 6-hour limit)
+      expect(maxInfo[2]).to.equal(true); // It's a user limit
+
+      // bob should be able to withdraw
+      await market.connect(matcher1).withdrawAsset(await bob.getAddress(), ethers.parseEther('100'), 1);
+
+      // now carol limited by 6-hour total limit
+      maxInfo = await market.getMaxWithdrawAmount(await carol.getAddress());
+      expect(maxInfo[0]).to.equal(ethers.parseEther('0'));
+      expect(maxInfo[1]).to.equal(1); // Limiting index is 1 (the 6-hour limit)
+      expect(maxInfo[2]).to.equal(false); // It's a total limit
+
+      // everybody free to withdraw after 6 hours
+      await ethers.provider.send('evm_increaseTime', [3600 * 6]);
+      await ethers.provider.send('evm_mine');
+      for (const user of [alice, bob, carol]) {
+        maxInfo = await market.getMaxWithdrawAmount(await user.getAddress());
+        expect(maxInfo[0]).to.equal(ethers.parseEther('100'));
+        expect(maxInfo[1]).to.equal(0);
+        expect(maxInfo[2]).to.equal(true);
+      }
     });
 
     it('should reset limits after time passes', async function () {
