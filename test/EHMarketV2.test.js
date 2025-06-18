@@ -146,33 +146,56 @@ describe('EHMarketV2', function () {
       expect(limit1.timeWindow).to.equal(withdrawLimits[1].timeWindow);
     });
 
-    it('should sort withdraw limits', async function () {
+    it('should enforce unique limits', async function () {
       const { owner, market } = container;
-      const withdrawLimits = [
-        { limit: ethers.parseEther('10000'), userLimit: ethers.parseEther('1000'), timeWindow: 6 },
-        { limit: ethers.parseEther('5000'), userLimit: ethers.parseEther('500'), timeWindow: 1 },
-        { limit: ethers.parseEther('10000'), userLimit: ethers.parseEther('1000'), timeWindow: 5 },
-      ];
-      await expect(market.connect(owner).setWithdrawLimits(withdrawLimits)).to.emit(market, 'WithdrawLimitsUpdated');
-      const limit0 = await market.withdrawLimits(0);
-      expect(limit0.timeWindow).to.equal(1);
-      const limit1 = await market.withdrawLimits(1);
-      expect(limit1.timeWindow).to.equal(5);
-      const limit2 = await market.withdrawLimits(2);
-      expect(limit2.timeWindow).to.equal(6);
+      await expect(
+        market.connect(owner).setWithdrawLimits([
+          { limit: ethers.parseEther('1'), userLimit: ethers.parseEther('1'), timeWindow: 6 },
+          { limit: ethers.parseEther('2'), userLimit: ethers.parseEther('2'), timeWindow: 6 },
+        ]),
+      ).to.be.revertedWithCustomError(market, 'InvalidWithdrawLimit');
+      await expect(
+        market.connect(owner).setWithdrawLimits([
+          { limit: ethers.parseEther('1'), userLimit: ethers.parseEther('1'), timeWindow: 6 },
+          { limit: ethers.parseEther('2'), userLimit: ethers.parseEther('1'), timeWindow: 7 },
+        ]),
+      ).to.be.revertedWithCustomError(market, 'InvalidWithdrawLimit');
+      await expect(
+        market.connect(owner).setWithdrawLimits([
+          { limit: ethers.parseEther('3'), userLimit: ethers.parseEther('1'), timeWindow: 6 },
+          { limit: ethers.parseEther('3'), userLimit: ethers.parseEther('2'), timeWindow: 7 },
+        ]),
+      ).to.be.revertedWithCustomError(market, 'InvalidWithdrawLimit');
+      // correct usage
+      await expect(
+        market.connect(owner).setWithdrawLimits([
+          { limit: ethers.parseEther('2'), userLimit: ethers.parseEther('1'), timeWindow: 5 },
+          { limit: ethers.parseEther('3'), userLimit: ethers.parseEther('2'), timeWindow: 6 },
+        ]),
+      ).to.emit(market, 'WithdrawLimitsUpdated');
     });
 
-    it('should enforce unique time windows', async function () {
+    it('limits should be ordered in ascending order', async function () {
       const { owner, market } = container;
-      const withdrawLimits = [
-        { limit: ethers.parseEther('10000'), userLimit: ethers.parseEther('1000'), timeWindow: 6 },
-        { limit: ethers.parseEther('5000'), userLimit: ethers.parseEther('500'), timeWindow: 6 },
-        { limit: ethers.parseEther('10000'), userLimit: ethers.parseEther('1000'), timeWindow: 5 },
-      ];
-      await expect(market.connect(owner).setWithdrawLimits(withdrawLimits)).to.be.revertedWithCustomError(
-        market,
-        'DuplicateWithdrawLimit',
-      );
+      await expect(
+        market.connect(owner).setWithdrawLimits([
+          { limit: ethers.parseEther('1'), userLimit: ethers.parseEther('1'), timeWindow: 6 },
+          { limit: ethers.parseEther('2'), userLimit: ethers.parseEther('2'), timeWindow: 5 },
+        ]),
+      ).to.be.revertedWithCustomError(market, 'InvalidWithdrawLimit');
+
+      await expect(
+        market.connect(owner).setWithdrawLimits([
+          { limit: ethers.parseEther('4'), userLimit: ethers.parseEther('1'), timeWindow: 5 },
+          { limit: ethers.parseEther('3'), userLimit: ethers.parseEther('2'), timeWindow: 6 },
+        ]),
+      ).to.be.revertedWithCustomError(market, 'InvalidWithdrawLimit');
+      await expect(
+        market.connect(owner).setWithdrawLimits([
+          { limit: ethers.parseEther('3'), userLimit: ethers.parseEther('2'), timeWindow: 5 },
+          { limit: ethers.parseEther('3'), userLimit: ethers.parseEther('1'), timeWindow: 6 },
+        ]),
+      ).to.be.revertedWithCustomError(market, 'InvalidWithdrawLimit');
     });
 
     it('should reject invalid withdraw limits', async function () {
@@ -306,9 +329,9 @@ describe('EHMarketV2', function () {
       const { owner, market, matcher1, alice, usdt, bob, carol } = container;
 
       await market.connect(owner).setWithdrawLimits([
-        { limit: ethers.parseEther('3000'), userLimit: ethers.parseEther('2000'), timeWindow: 24 },
-        { limit: ethers.parseEther('300'), userLimit: ethers.parseEther('200'), timeWindow: 6 },
         { limit: ethers.parseEther('200'), userLimit: ethers.parseEther('100'), timeWindow: 1 },
+        { limit: ethers.parseEther('300'), userLimit: ethers.parseEther('200'), timeWindow: 6 },
+        { limit: ethers.parseEther('3000'), userLimit: ethers.parseEther('2000'), timeWindow: 24 },
       ]);
 
       const depositAmount = ethers.parseEther('2000');

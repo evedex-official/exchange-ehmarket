@@ -22,7 +22,6 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
   error UserLimitExceeded(uint256 currentTotal, uint256 requestedAmount, uint256 configIndex);
   error InvalidWithdrawLimit(uint256 limit, uint256 userLimit, uint16 timeWindow);
   error InvalidWithdrawLimitLength();
-  error DuplicateWithdrawLimit(uint16 timeWindow);
 
   event UserBalanceChanged(address indexed account, int256 amount, uint256 requestId);
   event DelegateUpdated(address indexed delegator, address indexed delegate, uint256 allowance);
@@ -228,40 +227,37 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
   /**
    * @dev Internal implementation of setWithdrawLimits.
    * See {setWithdrawLimits} for details.
-   * @dev Additional note: Used for migration purposes.
    */
   function _setWithdrawLimits(WithdrawLimit[] memory _withdrawLimits) private {
     if (_withdrawLimits.length > MAX_LIMIT_CONFIGS) {
       revert InvalidWithdrawLimitLength();
     }
     delete withdrawLimits;
-    uint256 timeWindowBitmap = 0;
-    for (uint256 i = 0; i < _withdrawLimits.length; i++) {
+    if (_withdrawLimits.length == 0) {
+      emit WithdrawLimitsUpdated(withdrawLimits);
+      return;
+    }
+    WithdrawLimit memory firstLimit = _withdrawLimits[0];
+    if (
+      firstLimit.limit == 0 ||
+      firstLimit.userLimit == 0 ||
+      firstLimit.timeWindow == 0 ||
+      firstLimit.limit < firstLimit.userLimit
+    ) {
+      revert InvalidWithdrawLimit(firstLimit.limit, firstLimit.userLimit, firstLimit.timeWindow);
+    }
+    withdrawLimits.push(firstLimit);
+    for (uint256 i = 1; i < _withdrawLimits.length; i++) {
       WithdrawLimit memory newLimit = _withdrawLimits[i];
       if (
-        newLimit.limit == 0 ||
-        newLimit.userLimit == 0 ||
-        newLimit.timeWindow == 0 ||
+        newLimit.limit <= _withdrawLimits[i - 1].limit ||
+        newLimit.userLimit <= _withdrawLimits[i - 1].userLimit ||
+        newLimit.timeWindow <= _withdrawLimits[i - 1].timeWindow ||
         newLimit.limit < newLimit.userLimit
       ) {
         revert InvalidWithdrawLimit(newLimit.limit, newLimit.userLimit, newLimit.timeWindow);
       }
-      uint256 timeWindowBit = 1 << newLimit.timeWindow;
-      if (timeWindowBitmap & timeWindowBit != 0) {
-        revert DuplicateWithdrawLimit(newLimit.timeWindow);
-      }
-      timeWindowBitmap |= timeWindowBit;
-      uint256 pos = 0;
-      while (pos < withdrawLimits.length && withdrawLimits[pos].timeWindow < newLimit.timeWindow) {
-        pos++;
-      }
-      withdrawLimits.push();
-      if (pos < withdrawLimits.length - 1) {
-        for (uint256 j = withdrawLimits.length - 1; j > pos; j--) {
-          withdrawLimits[j] = withdrawLimits[j - 1];
-        }
-      }
-      withdrawLimits[pos] = newLimit;
+      withdrawLimits.push(newLimit);
     }
     emit WithdrawLimitsUpdated(withdrawLimits);
   }
