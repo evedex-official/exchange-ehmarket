@@ -1,4 +1,4 @@
-const { ethers } = require('hardhat');
+const { ethers } = require('ethers');
 const { migration } = require('../../scripts/deploy');
 const hardhat = require('hardhat');
 
