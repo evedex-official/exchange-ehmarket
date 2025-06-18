@@ -1,5 +1,6 @@
 const { ethers } = require('hardhat');
 const { migration } = require('../../scripts/deploy');
+const hardhat = require('hardhat');
 
 module.exports = migration(async (deployer) => {
   const matchers = JSON.parse(process.env[`${hardhat.network.name}_EHMARKET_MATCHERS`] ?? '[]');
@@ -12,9 +13,6 @@ module.exports = migration(async (deployer) => {
 
   if (matchers.some((matcher) => !ethers.isAddress(matcher))) {
     throw new Error('Invalid matcher wallet address');
-  }
-  if (ethers.isAddress(collateral)) {
-    throw new Error('Invalid collateral wallet address');
   }
 
   await deployer.deployProxy('contracts/EHMarketV2.sol:EHMarketV2', {
