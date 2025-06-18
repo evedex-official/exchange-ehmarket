@@ -119,6 +119,14 @@ describe('EHMarketV2', function () {
         .withArgs(adminRole, bob.address, owner.address);
       expect(await market.hasRole(adminRole, bob.address)).to.be.false;
     });
+
+    it('setDelegate should throw event', async function () {
+      const { owner, market, matcher1 } = container;
+      const delegate = await matcher1.getAddress();
+      await expect(market.connect(owner).setDelegate(delegate, 1))
+        .to.emit(market, 'DelegateUpdated')
+        .withArgs(await owner.getAddress(), delegate, 1);
+    });
   });
 
   describe('withdraw limits', async function () {
@@ -144,6 +152,22 @@ describe('EHMarketV2', function () {
       expect(limit1.limit).to.equal(withdrawLimits[1].limit);
       expect(limit1.userLimit).to.equal(withdrawLimits[1].userLimit);
       expect(limit1.timeWindow).to.equal(withdrawLimits[1].timeWindow);
+    });
+
+    it('should throw if too much limits', async function () {
+      const { owner, market } = container;
+      const withdrawLimits = [];
+      for (let i = 0; i < 100; i++) {
+        withdrawLimits.push({
+          limit: ethers.parseEther('1000'),
+          userLimit: ethers.parseEther('100'),
+          timeWindow: 1,
+        });
+      }
+      await expect(market.connect(owner).setWithdrawLimits(withdrawLimits)).to.be.revertedWithCustomError(
+        market,
+        'InvalidWithdrawLimitLength',
+      );
     });
 
     it('should enforce unique limits', async function () {
@@ -279,6 +303,12 @@ describe('EHMarketV2', function () {
     it('should correctly calculate max withdraw amount', async function () {
       const { owner, market, matcher1, alice, usdt, bob, carol } = container;
 
+      // without limits, max withdraw should be unlimited
+      let maxInfo = await market.getMaxWithdrawAmount(await alice.getAddress());
+      expect(maxInfo[0]).to.equal(ethers.MaxUint256);
+      expect(maxInfo[1]).to.equal(ethers.MaxUint256);
+      expect(maxInfo[2]).to.equal(false);
+
       await market.connect(owner).setWithdrawLimits([
         { limit: ethers.parseEther('200'), userLimit: ethers.parseEther('100'), timeWindow: 1 },
         { limit: ethers.parseEther('300'), userLimit: ethers.parseEther('200'), timeWindow: 6 },
@@ -292,7 +322,7 @@ describe('EHMarketV2', function () {
       await usdt.connect(carol).approve(await market.getAddress(), depositAmount);
       await market.connect(carol).depositAsset(depositAmount);
 
-      let maxInfo = await market.getMaxWithdrawAmount(await alice.getAddress());
+      maxInfo = await market.getMaxWithdrawAmount(await alice.getAddress());
       expect(maxInfo[0]).to.equal(ethers.parseEther('100')); // Max amount is 100 (from 1-hour limit)
       expect(maxInfo[1]).to.equal(0); // Limiting index is 0 (the 1-hour limit)
       expect(maxInfo[2]).to.equal(true); // It's a user limit
