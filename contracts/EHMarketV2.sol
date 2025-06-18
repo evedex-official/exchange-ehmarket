@@ -202,19 +202,17 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
    */
   function _checkWithdrawLimits(uint256 amount, address user) internal view {
     if (withdrawLimits.length == 0) return;
-    uint256 timestamp = block.timestamp;
-    uint256 startHour = _getHour(timestamp);
-    uint256 globalTotal = 0;
-    uint256 userTotal = 0;
-    uint16 lastCheckedHour = 0;
+    uint256 baseTimestamp = block.timestamp;
+    uint256 globalTotal;
+    uint256 userTotal;
+    uint16 lastTimeWindow;
     for (uint256 i = 0; i < withdrawLimits.length; i++) {
       WithdrawLimit memory limit = withdrawLimits[i];
-      for (uint256 h = lastCheckedHour; h < limit.timeWindow; h++) {
-        uint256 hourToCheck = startHour - h * 1 hours;
-        globalTotal += hourlyWithdrawals[hourToCheck];
-        userTotal += userHourlyWithdrawals[hourToCheck][user];
-      }
-      lastCheckedHour = limit.timeWindow;
+      uint256 timestamp = baseTimestamp - 1 hours * uint256(lastTimeWindow);
+      uint16 timeWindow = limit.timeWindow - lastTimeWindow;
+      globalTotal += getTotalWithdraw(timeWindow, timestamp);
+      userTotal += getUserTotalWithdraw(timeWindow, timestamp, user);
+      lastTimeWindow = limit.timeWindow;
       if (globalTotal + amount > limit.limit) {
         revert TotalLimitExceeded(globalTotal, amount, i);
       }
