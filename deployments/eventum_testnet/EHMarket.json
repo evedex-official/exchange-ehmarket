@@ -1,13 +1,40 @@
 {
   "name": "EHMarket",
-  "address": "0x66208B370a58812533EC7aa6971B9702B1e58cC8",
+  "address": "0x3151cCd88D8629B021330c018eb5D903083121D8",
   "contractName": "EHMarketV2",
   "sourceName": "contracts/EHMarketV2.sol",
   "args": [
     [
       "0x649B84a0F681e196fDF680042A97542535Dd7ebF"
     ],
-    "0x52230985B8935ea300C37362b7E6d25E562fb17B"
+    "0x52230985B8935ea300C37362b7E6d25E562fb17B",
+    [
+      {
+        "limit": 100000000,
+        "userLimit": 10000000,
+        "timeWindow": 1
+      },
+      {
+        "limit": 600000000,
+        "userLimit": 60000000,
+        "timeWindow": 6
+      },
+      {
+        "limit": 1200000000,
+        "userLimit": 120000000,
+        "timeWindow": 12
+      },
+      {
+        "limit": 2400000000,
+        "userLimit": 240000000,
+        "timeWindow": 24
+      },
+      {
+        "limit": 7200000000,
+        "userLimit": 720000000,
+        "timeWindow": 72
+      }
+    ]
   ],
   "libraries": {},
   "abi": [
@@ -35,17 +62,6 @@
         }
       ],
       "name": "AccessControlUnauthorizedAccount",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint16",
-          "name": "timeWindow",
-          "type": "uint16"
-        }
-      ],
-      "name": "DuplicateWithdrawLimit",
       "type": "error"
     },
     {
@@ -660,49 +676,6 @@
     {
       "inputs": [
         {
-          "components": [
-            {
-              "internalType": "uint256",
-              "name": "limit",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "userLimit",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint16",
-              "name": "timeWindow",
-              "type": "uint16"
-            }
-          ],
-          "internalType": "struct EHMarketV2.WithdrawLimit[]",
-          "name": "_initialWithdrawLimits",
-          "type": "tuple[]"
-        }
-      ],
-      "name": "migrateToV2",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "migratedToV2",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
           "internalType": "bytes32",
           "name": "role",
           "type": "bytes32"
@@ -880,9 +853,9 @@
       "type": "function"
     }
   ],
-  "blockNumber": 461860,
+  "blockNumber": 476596,
   "upgradable": {
-    "implementation": "0xc9bf97Efb7E33699904e80aF7c3Ee730770440ed",
-    "proxyAdmin": "0x31044eD36a41593E2fb4209D58C340D47720C424"
+    "implementation": "0x550132688379b639b2f0D533EE5D5B2485158F04",
+    "proxyAdmin": "0x6357315cF9fD07c53e507A8d99e23740D922Df64"
   }
 }
