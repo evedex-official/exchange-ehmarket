@@ -154,6 +154,39 @@ describe('EHMarketV2', function () {
       expect(limit1.timeWindow).to.equal(withdrawLimits[1].timeWindow);
     });
 
+    it('should allow admin to withdraw without limits', async function () {
+      const { owner, market, alice, usdt } = container;
+      await market
+        .connect(owner)
+        .setWithdrawLimits([{ limit: ethers.parseEther('2000'), userLimit: ethers.parseEther('500'), timeWindow: 6 }]);
+
+      const depositAmount = ethers.parseEther('3000');
+      await usdt.connect(alice).approve(await market.getAddress(), depositAmount);
+      await market.connect(alice).depositAsset(depositAmount);
+      const withdrawAmount = ethers.parseEther('3000');
+      await market.connect(owner).withdrawAsset(await alice.getAddress(), withdrawAmount, 1);
+    });
+
+    it('should allow matcher with admin role withdraw without limits', async function () {
+      const { market, matcher1, alice, usdt } = container;
+
+      await market.grantRole(await market.DEFAULT_ADMIN_ROLE(), matcher1.getAddress());
+      await market.grantRole(await market.MATCHER_ROLE(), matcher1.getAddress());
+
+      await market.setWithdrawLimits([
+        { limit: ethers.parseEther('2000'), userLimit: ethers.parseEther('500'), timeWindow: 6 },
+      ]);
+
+      const depositAmount = ethers.parseEther('3000');
+      await usdt.connect(alice).approve(await market.getAddress(), depositAmount);
+      await market.connect(alice).depositAsset(depositAmount);
+      const withdrawAmount = ethers.parseEther('3000');
+      await market.connect(matcher1).withdrawAsset(await alice.getAddress(), withdrawAmount, 1);
+
+      // revoking admin role from matcher for future tests
+      await market.revokeRole(await market.DEFAULT_ADMIN_ROLE(), matcher1.getAddress());
+    });
+
     it('should throw if too much limits', async function () {
       const { owner, market } = container;
       const withdrawLimits = [];
