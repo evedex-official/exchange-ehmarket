@@ -73,8 +73,9 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
 
   function withdrawAsset(address from, uint256 amount, uint256 requestId) external {
     bool isMatcher = hasRole(MATCHER_ROLE, _msgSender());
-    require(isMatcher || hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), UnauthorizedSigner());
-    if (isMatcher) {
+    bool isAdmin = hasRole(DEFAULT_ADMIN_ROLE, _msgSender());
+    require(isMatcher || isAdmin, UnauthorizedSigner());
+    if (isMatcher && !isAdmin) {
       _checkWithdrawLimits(amount, from);
       uint256 currentHour = _getHour(block.timestamp);
       hourlyWithdrawals[currentHour] += amount;
@@ -143,14 +144,15 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
     maxAmount = type(uint256).max;
     limitingIndex = type(uint256).max;
     isUserLimit = false;
-    if (withdrawLimits.length == 0) {
+    uint256 withdrawLimitsLength = withdrawLimits.length;
+    if (withdrawLimitsLength == 0) {
       return (maxAmount, limitingIndex, isUserLimit);
     }
     uint256 baseTimestamp = block.timestamp;
     uint256 globalTotal;
     uint256 userTotal;
     uint16 lastTimeWindow;
-    for (uint256 i = 0; i < withdrawLimits.length; i++) {
+    for (uint256 i = 0; i < withdrawLimitsLength; i++) {
       WithdrawLimit memory limit = withdrawLimits[i];
       uint256 timestamp = baseTimestamp - 1 hours * uint256(lastTimeWindow);
       uint16 timeWindow = limit.timeWindow - lastTimeWindow;
@@ -196,12 +198,13 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
    * @param user User address attempting to withdraw
    */
   function _checkWithdrawLimits(uint256 amount, address user) internal view {
-    if (withdrawLimits.length == 0) return;
+    uint256 withdrawLimitsLength = withdrawLimits.length;
+    if (withdrawLimitsLength == 0) return;
     uint256 baseTimestamp = block.timestamp;
     uint256 globalTotal;
     uint256 userTotal;
     uint16 lastTimeWindow;
-    for (uint256 i = 0; i < withdrawLimits.length; i++) {
+    for (uint256 i = 0; i < withdrawLimitsLength; i++) {
       WithdrawLimit memory limit = withdrawLimits[i];
       uint256 timestamp = baseTimestamp - 1 hours * uint256(lastTimeWindow);
       uint16 timeWindow = limit.timeWindow - lastTimeWindow;
@@ -239,7 +242,6 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
     ) {
       revert InvalidWithdrawLimit(firstLimit.limit, firstLimit.userLimit, firstLimit.timeWindow);
     }
-    withdrawLimits.push(firstLimit);
     for (uint256 i = 1; i < _withdrawLimits.length; i++) {
       WithdrawLimit memory newLimit = _withdrawLimits[i];
       if (
@@ -250,8 +252,8 @@ contract EHMarketV2 is AccessControlEnumerableUpgradeable {
       ) {
         revert InvalidWithdrawLimit(newLimit.limit, newLimit.userLimit, newLimit.timeWindow);
       }
-      withdrawLimits.push(newLimit);
     }
+    withdrawLimits = _withdrawLimits;
     emit WithdrawLimitsUpdated(withdrawLimits);
   }
 }
