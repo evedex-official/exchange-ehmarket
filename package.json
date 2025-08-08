@@ -33,6 +33,7 @@
     "tiny-glob": "^0.2.9"
   },
   "devDependencies": {
+    "@nomicfoundation/hardhat-verify": "^2.1.1",
     "solidity-coverage": "^0.8.16"
   }
 }
