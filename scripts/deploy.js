@@ -378,7 +378,7 @@ class Deployer {
      * @param {{ libraries?: Libraries } | undefined} options
      */
     async deployProxyImplementation(proxyName, implementation, options = {}) {
-        const { libraries } = {
+    const { libraries, unsafeAllow } = {
             libraries: {},
             ...options,
         };
@@ -388,6 +388,7 @@ class Deployer {
         const factory = await this.hre.ethers.getContractFactoryFromArtifact(artifact, { libraries });
         const tx = await this.hre.upgrades.prepareUpgrade(proxy.address, factory, {
             getTxResponse: true,
+            unsafeAllow,
         });
         console.info(
             new Info()
@@ -656,7 +657,7 @@ task('export-deployed', 'Export info of deployed contract')
 
 task('export-abi', 'Export ABI of deployed contract')
     .addParam('dir', 'Output directory')
-    .setAction(async (options, hre) => {
+    .setAction(async (options, hre) => { 
         await fs.promises.mkdir(options.dir, { recursive: true });
         const artifactsDir = path.resolve(hre.config.paths.artifacts, './contracts');
         const artifacts = await glob(path.resolve(artifactsDir, './**/*.sol/*.json'), {
